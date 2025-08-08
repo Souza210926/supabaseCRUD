@@ -1,48 +1,97 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
-import supabase from "./supabaseClient";
+import supabase from "./supabaseClient.js";
 
 function App() {
-  const [listaTarefas, setListaTarefas] = useState([]);
-  const [novaTarefa, setNovaTarefa] = useState("");
+  const [todoList, setTodoList] = useState([]);
+  const [newTodo, setNewTodo] = useState("");
+
+  useEffect(() => {
+    fetchTodos();
+  }, []);
+
+  const fetchTodos = async () => {
+    const { data, error } = await supabase.from("TodoList").select("*");
+    if (error) {
+      console.log("Error fetching: ", error);
+    } else {
+      setTodoList(data);
+    }
+  };
 
   const addTodo = async () => {
-    const novosDados = {
-      name: novaTarefa,
-      completo: false,
+    const newTodoData = {
+      name: newTodo,
+      isCompleted: false,
     };
     const { data, error } = await supabase
-      .from("ListaDeTarefas")
-      .insert([novosDados])
+      .from("TodoList")
+      .insert([newTodoData])
       .single();
 
-      if(error) {
-        console.log("Erro ao adicionar tarefa:", error);
-      }
-      else {
-        setListaTarefas((prev) => [...prev, data]);
-        setNovaTarefa("");
-      }
+    if (error) {
+      console.log("Error adding todo: ", error);
+    } else {
+      setTodoList((prev) => [...prev, data]);
+      setNewTodo("");
+    }
+  };
 
-      console.log(listaTarefas)
+  const completeTask = async (id, isCompleted) => {
+    const { error } = await supabase
+      .from("TodoList")
+      .update({ isCompleted: !isCompleted })
+      .eq("id", id);
+
+    if (error) {
+      console.log("error toggling task: ", error);
+    } else {
+      const updatedTodoList = todoList.map((todo) =>
+        todo.id === id ? { ...todo, isCompleted: !isCompleted } : todo
+      );
+      setTodoList(updatedTodoList);
+    }
+  };
+
+  const deleteTask = async (id) => {
+    const { error } = await supabase
+      .from("TodoList")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.log("error deleting task: ", error);
+    } else {
+      setTodoList((prev) => prev.filter((todo) => todo.id !== id));
+    }
   };
 
   return (
-    <>
+    <div>
+      {" "}
+      <h1>Todo List</h1>
       <div>
-        <h1>Lista de Tarefas</h1>
-        <div>
-          <input
-            type="text"
-            placeholder="Nova Tarefa"
-            onChange={(e) => setNovaTarefa(e.target.value)}
-          />
-        </div>
-        <button onClick={addTodo}>Adicionar item</button>
+        <input
+          type="text"
+          placeholder="New Todo..."
+          value={newTodo}
+          onChange={(e) => setNewTodo(e.target.value)}
+        />
+        <button onClick={addTodo}> Add Todo Item</button>
       </div>
-
-      <ul></ul>
-    </>
+      <ul>
+        {todoList.map((todo) => (
+          <li>
+            <p> {todo.name}</p>
+            <button onClick={() => completeTask(todo.id, todo.isCompleted)}>
+              {" "}
+              {todo.isCompleted ? "Undo" : "Complete Task"}
+            </button>
+            <button onClick={() => deleteTask(todo.id)}> Delete Task</button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
